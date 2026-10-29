@@ -303,6 +303,25 @@ jobs:
           install -Dp ./geoip.metadb ./publish/
           install -Dp ./geoip-lite.metadb ./publish/
           install -Dp ./BundleMRS.7z ./publish/
+
+          # Losslessly shrink MMDB assets before checksums and release.
+          MMDB_SHRINK_VERSION=1.5.1
+          MMDB_SHRINK_SHA256=7a50c451947466ce9bdebd181c272ac3226b725af480447124db29b952c719fc
+          curl -fsSL -o /tmp/mmdbshrink.tar.gz \
+            "https://github.com/ipinfo/mmdbctl/releases/download/mmdbctl-${MMDB_SHRINK_VERSION}/mmdbshrink_${MMDB_SHRINK_VERSION}_linux_amd64.tar.gz"
+          echo "${MMDB_SHRINK_SHA256}  /tmp/mmdbshrink.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/mmdbshrink.tar.gz -C /tmp
+          MMDB_SHRINK_BIN="/tmp/mmdbshrink_${MMDB_SHRINK_VERSION}_linux_amd64"
+          chmod +x "$MMDB_SHRINK_BIN"
+          for f in country.mmdb country-lite.mmdb geoip.metadb geoip-lite.metadb geoip.db geoip-lite.db; do
+            if "$MMDB_SHRINK_BIN" "./publish/$f" "./publish/$f.shrunk"; then
+              mv "./publish/$f.shrunk" "./publish/$f"
+            else
+              rm -f "./publish/$f.shrunk"
+              echo "::warning file=publish/$f::mmdbshrink failed; keeping original"
+            fi
+          done
+
           cd ./publish || exit 1
           sha256sum country.mmdb > country.mmdb.sha256sum
           sha256sum country-lite.mmdb > country-lite.mmdb.sha256sum
